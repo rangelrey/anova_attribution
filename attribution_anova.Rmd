@@ -1,0 +1,175 @@
+---
+title: "Attribution modelling"
+output:
+  word_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+library(dplyr) 
+library(flextable)
+library(knitr)
+library("ggpubr")
+opts_knit$set(global.par = TRUE)
+library(phia)
+```
+
+## 
+
+
+## Introduction: 
+
+In the ecommerce field, companies invest in marketing channels in order to get new customers and most importantly attract previous customers to buy again. In order to evaluate the performance of these channels, there are different attribution models available in the literature. From very basic ones to neural network models. 
+A customer journey might start with channel A and end up with channel D before making a purchase, therefore the customer journey consists of A,B,C,D.
+The main question marketing analysts face is to which touchpoint has the order to be attributed to. A? B? C? D? all of them ?
+
+This study will focus on 4 basic models: first touch attribution, which attributes the order to A, last-touch attribution which attributed the order to D, last-non-direct attribution which attributes the order to the last touchpoint that is not a direct entry to the website and a linear model, which attributes proportionally to each touchpoint. In the previous example 25% to each of them.
+The main question is therefore, are the models giving us a different attribution ? In other words, are the means of the groups significalty different from each other ?
+
+## Methodology:
+
+```{r echo=FALSE, message=FALSE, warning=FALSE }
+```
+
+```{r echo=FALSE }
+dfu <-read.table("/home/rangelrey/gitrepos/attribution_anova/data/attrib_anova_unf.csv", header=TRUE,     sep=",")
+df <-read.table("/home/rangelrey/gitrepos/attribution_anova/data/attrib_anova.csv", header=TRUE,     sep=",")
+```
+The data used in this study is based on a multinational european fast-moving consumer goods dataset. The same as the previous research questions. For privacy reasons the data is completely anonymized and only 50k rows of data will be used in this study, the original dataset is 2 million.
+
+Each row represents a different channel. Orders are the amount of purchases.
+
+Figure 1
+```{r echo=FALSE}
+flextable(head(df, 4))
+```
+First 4 rows of the dataset
+Figure 2
+```{r echo=FALSE }
+flextable( as.data.frame.matrix(summary(dfu)) )
+```
+Summary table. Main descriptive statistics
+
+At a first sight, the medians seem to be quite different, in comparison with the means, which are around 23k. 
+The distribution of the data looking at the quartiles doesn't seem to be extremely different, but enough different to raise doubts.
+
+```{r echo=FALSE }
+boxplot(dfu$fst_orders, dfu$lst_orders, dfu$lstnd_orders, dfu$lnr_orders, names=c("First T. Attrib","Last T. Attrib","Last ND T. Attrib","Linear T. Attrib"), data=df, main ="Number of orders", xlab="Attribution Model", ylab="Orders", sub="Figure 3")
+```
+Boxplot of each model with their respective order data
+A boxplot helps us to understand the distribution of the data and compare between groups.
+Note the extreme values. They cannot be removed from the data set since they belong to the most important channels in the dataset
+
+
+
+Figure 4
+```{r echo=FALSE }
+qqnorm(df$orders, sub="Figure 4")
+```
+Q-Q plot to check normality.
+
+In Figure 4 we plot the quantiles our or dataset with the theoretical quantiles of a normal distribution. We can also observe the skewness of the distribution. In this case the upper end of the Q-Q plot deviates from the straight line. We can say the distribution is skewed to the right.
+
+Computing the variances of the 4 groups we get variances quite different variances being the highest variance 40% than the lowest. This implies that variances are not equal between groups, which is not ideal for non-parametric tests, but since our group sizes are equal it is pretty much irrelevant.
+
+```{r echo=FALSE }
+var(dfu$fst_orders)
+var(dfu$lst_orders)
+var(dfu$lstnd_orders)
+var(dfu$lnr_orders)
+```
+
+
+Due to unequal variance and non-normality, in order to compare the 4 groups, a non-parametric test will be used: The Kruskal-Wallis test. This test is for non-normal data to pursue a one-way analysis of varianc and is basd on the ranks, not the absolute values. It tests whether the samples come from the same distribution or not (not a mean-test). It is used to compare two or more samples with equal or different sample sizes. It extends the Mann-Whitney U test used to compare only 2 groups. 
+It is the non-parametric equivalent of ANOVA.
+
+Figure 5
+
+```{r echo=FALSE }
+kruskal.test(model ~ orders, data =df)
+as_flextable(kruskal.test(model ~ orders, data =df))
+```
+Analysis of Variance between different models using Kruskal-Wallis test.
+
+With a 55.8 statistic (critical chi-square value), and a p-value of 0.59, we cannot reject the null hypothesis that the datasets come from the same distribution. 
+The degrees of freedom are k-1 4-1 = 3, being k the groups. 
+The alternative hypothesis which is that at least of the groups comes from a different population than the others, cannot be used.
+
+
+```{r echo=FALSE }
+qplot(model, orders, colour =type, data =df, main ="Orders per model & channel type-Figure 6", xlab="Model", ylab="Orders")
+```
+
+```{r echo=FALSE }
+ggboxplot(df, x = "model", y = "orders", color = "type",
+          palette = c("#00AFBB", "#E7B800"))
+```
+
+```{r echo=FALSE }
+lm_df<-lm(df$orders~df$model +df$type)
+plot(lm_df)
+
+
+```
+
+
+```{r echo=FALSE }
+Model=factor(df$Model)
+Type=factor(df$type)
+lm_df<-lm(df$orders~df$model +df$type)
+summary(lm_df)
+
+
+```
+
+
+
+
+```{r echo=FALSE }
+qqnorm(df$orders, sub="Figure 4")
+```
+```{r echo=FALSE }
+df$orders.prev.arc<-asin(sqrt(df$orders/1000000000))
+df$orders.prev.arc
+df$orders
+qqnorm(df$orders, sub="Figure 4")
+```
+
+```{r echo=FALSE }
+wilcox.test(df$cart_ad_infl, df$cart_ad_non.infl,  alternative ="less")
+```
+Figure 6
+```{r echo=FALSE }
+as_flextable(wilcox.test(df$cart_ad_infl, df$cart_ad_non.infl,  alternative ="less"))
+```
+Results of the wilcox sum-rank with alternative ="less"
+
+We can reject the null hypothesis that both medians of the two groups are the same and that the non-influenceable group has a higher location shift than the influenceable.
+
+The statistic is very high: 521793152, while the p-value is extremely low, way below the significance level of 5%. 
+
+With a 95% confidence level we can say that the non-influenciable group has a higher median than the influenceable group.
+The degrees of freedom are n-1 = 33683
+
+
+```{r echo=FALSE }
+channel_type <-c('Influenceable','Non-influenceable')
+cart_additions <-c(mean(df$cart_ad_infl),  mean(df$cart_ad_non.infl) )
+meansDf <-data.frame(channel_type, cart_additions)
+ggline(meansDf, x ="channel_type", y ="cart_additions", ylab="Average cart additions", color="red", point.color =("blue"), main="Average cart additions by channel type (Figure 7)")
+```
+Figure 7 represents the means of the cart additions by channel type, showing a clear difference between both groups.
+
+
+## Results
+
+The objective of this study was to find if there is a real difference between two groups of channels: Influenceable channels and non-influenceable channels. The former can be affected by marketing spent while the second cannot.
+After checking for normality in the data, we can conclude the data does not follow a normal distribution and it is positively skewed.
+
+In order to check if there is a significant difference between the two groups, a non-parametric test (wilcox rank-sum test) was implemented. 
+The result of the test shows a clear interpretation. The medians of both groups are different, being the influenceable median below the non-influenceable median in terms of cart additions.
+
+A message to the marketing managers would be to review which exact channels are causing this and why. The budget distribution might not be the most appropriate one since channels where capital investment is not necessary are bringing a higher amount of cart additions than more expensive channels.
+
+
+
